@@ -1,2 +1,3 @@
 # teamtext
-Modern imagining of the classic telephone game for education!
+
+*Modern reimagining of the classic telephone game for education!*
