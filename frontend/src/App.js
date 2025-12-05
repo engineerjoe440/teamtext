@@ -6,7 +6,7 @@ import './App.css';
 
 const MESSAGE_VISIBLE_TIME_MS = 5000;
 
-function App() {
+export default function App() {
   const theme = createTheme({
     palette: {
       primary: {
@@ -21,6 +21,7 @@ function App() {
   const [text, setText] = React.useState('');
   const listRef = React.useRef(null);
   const visibleTimers = React.useRef(new Map());
+  const wsRef = React.useRef(null);
 
   React.useEffect(() => {
     // auto-scroll to bottom
@@ -28,6 +29,58 @@ function App() {
       listRef.current.scrollTop = listRef.current.scrollHeight;
     }
   }, [messages]);
+
+  // WebSocket: connect, listen for incoming bot messages, and set up cleanup.
+  React.useEffect(() => {
+    const WS_URL = process.env.REACT_APP_WS_URL || 'ws://localhost:8000/ws';
+    let ws;
+    try {
+      ws = new WebSocket(WS_URL);
+    } catch (err) {
+      console.warn('WebSocket constructor failed', err);
+      return () => {};
+    }
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      // Optionally you could authenticate or send an initialization message here
+      console.debug('WebSocket connected to', WS_URL);
+    };
+
+    ws.onmessage = (ev) => {
+      try {
+        const payload = JSON.parse(ev.data);
+        // Expect payload like: { id?, sender: 'bot'|'me', text: '...' }
+        if (payload && payload.sender === 'bot') {
+          const id = payload.id || Date.now();
+          const text = payload.text || '';
+          // Add incoming bot message and mark visible so the loader shows
+          setMessages((m) => [...m, { id, sender: 'bot', text, visible: true }]);
+        }
+      } catch (e) {
+        console.warn('Failed to parse WS message', e, ev.data);
+      }
+    };
+
+    ws.onerror = (err) => {
+      console.warn('WebSocket error', err);
+    };
+
+    ws.onclose = (ev) => {
+      console.debug('WebSocket closed', ev.code, ev.reason);
+      // clear ref
+      if (wsRef.current === ws) wsRef.current = null;
+    };
+
+    return () => {
+      try {
+        if (ws && ws.readyState === WebSocket.OPEN) ws.close();
+      } catch (e) {
+        /* ignore */
+      }
+      if (wsRef.current === ws) wsRef.current = null;
+    };
+  }, []);
 
   // Schedule 5s deterministic loaders for any bot messages that have `visible: true`.
   // Keep track of each timer's start time so we can compute progress.
@@ -82,8 +135,23 @@ function App() {
   const send = () => {
     const trimmed = text.trim();
     if (!trimmed) return;
-    setMessages((m) => [...m, { id: Date.now(), sender: 'me', text: trimmed }]);
+    const id = Date.now();
+    // append locally immediately so UI is responsive
+    setMessages((m) => [...m, { id, sender: 'me', text: trimmed }]);
     setText('');
+
+    // transmit over websocket if available
+    const payload = JSON.stringify({ id, sender: 'me', text: trimmed });
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      try {
+        wsRef.current.send(payload);
+      } catch (e) {
+        console.warn('Failed to send message over WebSocket', e);
+      }
+    } else {
+      // if no websocket connection, still keep local message; optionally you could queue
+      console.warn('WebSocket not connected - message sent only locally');
+    }
   };
 
   const onKeyDown = (e) => {
@@ -194,5 +262,3 @@ function App() {
     </ThemeProvider>
   );
 }
-
-export default App;

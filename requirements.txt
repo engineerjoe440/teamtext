@@ -1,0 +1,12 @@
+fastapi
+pydantic[email]
+aiofiles
+sse-starlette
+jinja2
+jinja-markdown
+requests
+pyyaml
+python-multipart
+uvicorn[standard]
+loguru
+simple-toml-configurator
