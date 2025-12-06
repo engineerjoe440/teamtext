@@ -10,7 +10,7 @@ from typing import Annotated, Optional
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Cookie
+from fastapi import FastAPI, APIRouter, WebSocket, WebSocketDisconnect, Cookie
 from fastapi.requests import Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -22,6 +22,7 @@ from teamtext.logger import CustomLogger
 from teamtext.settings import get_settings
 from teamtext.users import SessionManager, get_session_manager
 from teamtext.users import router as user_router
+from teamtext.settings import router as settings_router
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -31,13 +32,23 @@ async def lifespan(_: FastAPI):
     yield
     logger.info("Application shutting down.")
 
+router = APIRouter(prefix="/api")
+router.include_router(user_router)
+router.include_router(settings_router)
+
+@router.post("/start-game")
+async def start_game():
+	"""Start the game by logging the event."""
+	logger.info("Game started with title: {}", get_settings().game_title)
+	return {"status": "Game started"}
+
 app = FastAPI(
 	title="TeamText",
 	summary="Modern reimagining of the classic telephone game for education!",
 	version=__version__,
 	lifespan=lifespan,
 )
-app.include_router(user_router)
+app.include_router(router)
 
 
 clients: SessionManager = get_session_manager()
@@ -137,6 +148,6 @@ async def websocket_endpoint(
             data = await user.receive_json()
             # For now simply echo the message back and log it
             print(f"Received from {user.user_id}:", data)
-            await user.send_json({"echo": data})
+            await user.send_json({"echo": data, "text": "👍"})
     except WebSocketDisconnect:
         await clients.disconnect(client_token)

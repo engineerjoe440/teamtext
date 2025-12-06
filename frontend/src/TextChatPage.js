@@ -62,7 +62,7 @@ export default function TextChatPage() {
       try {
         const payload = JSON.parse(ev.data);
         // Expect payload like: { id?, sender: 'teamtext-bot'|'<window.player_name>', text: '...' }
-        if (payload && payload.sender === 'teamtext-bot') {
+        if (payload && payload.text && payload.text !== '') {
           const id = payload.id || Date.now();
           const text = payload.text || '';
           // Add incoming bot message and mark visible so the loader shows

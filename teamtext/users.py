@@ -12,7 +12,7 @@ from typing import Optional
 from fastapi import WebSocket, APIRouter
 
 
-router = APIRouter(prefix="/api/users")
+router = APIRouter(prefix="/users")
 
 class User:
     """Class representing a user in TeamText.
@@ -53,7 +53,8 @@ class User:
         if not self.websocket:
             raise RuntimeError("No websocket connected for user")
         received = await self.websocket.receive_json()
-        self.messages_sent.append(received)
+        if text := received.get("text"):
+            self.messages_sent.append(text)
         return received
 
     async def close(self, code: int = 1000) -> None:
