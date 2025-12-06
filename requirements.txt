@@ -1,7 +1,6 @@
 fastapi
 pydantic[email]
 aiofiles
-sse-starlette
 jinja2
 jinja-markdown
 requests

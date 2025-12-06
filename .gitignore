@@ -1,3 +1,8 @@
+# Ignore React Files Built by Build System
+teamtext/static/frontend/
+teamtext/templates/index.html
+teamtext/config/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

@@ -7,7 +7,7 @@ const MESSAGE_VISIBLE_TIME_MS = 5000;
 
 export default function TextChat() {
   const [messages, setMessages] = React.useState([
-    { id: 1, sender: 'bot', text: "You're waiting for a message from another texter. It should appear shortly...", visible: true },
+    { id: 1, sender: 'teamtext-bot', text: "You're waiting for a message from another texter. It should appear shortly...", visible: true },
   ]);
   const [loadingValue, setLoadingValue] = React.useState(0);
   const [text, setText] = React.useState('');
@@ -24,7 +24,19 @@ export default function TextChat() {
 
   // WebSocket: connect, listen for incoming bot messages, and set up cleanup.
   React.useEffect(() => {
-    const WS_URL = process.env.REACT_APP_WS_URL || 'ws://localhost:8000/ws';
+    // Build a WebSocket URL from the active host when REACT_APP_WS_URL is not provided.
+    // Use secure wss when the page is served over https, otherwise use ws.
+    const WS_URL = process.env.REACT_APP_WS_URL || (() => {
+      try {
+        const loc = window.location;
+        const protocol = loc.protocol === 'https:' ? 'wss:' : 'ws:';
+        // keep host (hostname:port) and use '/ws' path
+        return `${protocol}//${loc.host}/ws`;
+      } catch (e) {
+        // Fallback to localhost if anything goes wrong (e.g., window undefined)
+        return 'ws://localhost:8000/ws';
+      }
+    })();
     let ws;
     try {
       ws = new WebSocket(WS_URL);
@@ -42,12 +54,12 @@ export default function TextChat() {
     ws.onmessage = (ev) => {
       try {
         const payload = JSON.parse(ev.data);
-        // Expect payload like: { id?, sender: 'bot'|'me', text: '...' }
-        if (payload && payload.sender === 'bot') {
+        // Expect payload like: { id?, sender: 'teamtext-bot'|'<window.player_name>', text: '...' }
+        if (payload && payload.sender === 'teamtext-bot') {
           const id = payload.id || Date.now();
           const text = payload.text || '';
           // Add incoming bot message and mark visible so the loader shows
-          setMessages((m) => [...m, { id, sender: 'bot', text, visible: true }]);
+          setMessages((m) => [...m, { id, sender: 'teamtext-bot', text, visible: true }]);
         }
       } catch (e) {
         console.warn('Failed to parse WS message', e, ev.data);
@@ -78,7 +90,7 @@ export default function TextChat() {
   // Keep track of each timer's start time so we can compute progress.
   React.useEffect(() => {
     messages.forEach((m) => {
-      if (m.sender === 'bot' && m.visible && !visibleTimers.current.has(m.id)) {
+      if (m.sender === 'teamtext-bot' && m.visible && !visibleTimers.current.has(m.id)) {
         const start = Date.now();
         const tid = setTimeout(() => {
           setMessages((prev) => prev.map((msg) => (msg.id === m.id ? { ...msg, visible: false } : msg)));
@@ -101,7 +113,7 @@ export default function TextChat() {
   // Update loadingValue (0-100) while any bot message is loading.
   React.useEffect(() => {
     let interval = null;
-    const anyLoading = messages.some((m) => m.sender === 'bot' && m.visible);
+    const anyLoading = messages.some((m) => m.sender === 'teamtext-bot' && m.visible);
     if (anyLoading) {
       interval = setInterval(() => {
         const now = Date.now();
@@ -129,11 +141,11 @@ export default function TextChat() {
     if (!trimmed) return;
     const id = Date.now();
     // append locally immediately so UI is responsive
-    setMessages((m) => [...m, { id, sender: 'me', text: trimmed }]);
+    setMessages((m) => [...m, { id, sender: window.player_name, text: trimmed }]);
     setText('');
 
     // transmit over websocket if available
-    const payload = JSON.stringify({ id, sender: 'me', text: trimmed });
+    const payload = JSON.stringify({ id, sender: window.player_name, text: trimmed });
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       try {
         wsRef.current.send(payload);
@@ -157,7 +169,7 @@ export default function TextChat() {
       <Box sx={{ height: '95vh', bgcolor: 'primary.background', position: 'relative' }}>
       {/* Header is positioned absolutely so content can size to full viewport without adding page scroll */}
       <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 2 }}>
-        <Typography variant="h6" component="div" sx={{ textAlign: 'center', color: 'rgba(255,255,255,0.95)' }}>TeamText</Typography>
+        <Typography variant="h6" component="div" sx={{ textAlign: 'center', color: 'rgba(255,255,255,0.95)' }}>{window.game_title}</Typography>
       </Box>
 
       <Box sx={{ position: 'relative', height: '95vh' }}>
@@ -201,15 +213,15 @@ export default function TextChat() {
                 key={m.id}
                 sx={{
                   display: 'flex',
-                  justifyContent: m.sender === 'me' ? 'flex-end' : 'flex-start',
+                  justifyContent: m.sender === window.player_name ? 'flex-end' : 'flex-start',
                 }}
               >
-                {((m.visible && m.sender === 'bot') || m.sender !== 'bot') && (
+                {((m.visible && m.sender === 'teamtext-bot') || m.sender !== 'teamtext-bot') && (
                   <Box
                     sx={{
                       maxWidth: '80%',
-                      bgcolor: m.sender === 'me' ? 'primary.main' : 'grey.200',
-                      color: m.sender === 'me' ? 'primary.contrastText' : 'text.primary',
+                      bgcolor: m.sender === window.player_name ? 'primary.main' : 'grey.200',
+                      color: m.sender === window.player_name ? 'primary.contrastText' : 'text.primary',
                       px: 2,
                       py: 1,
                       borderRadius: 2,
