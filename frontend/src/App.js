@@ -3,7 +3,8 @@ import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import { Box, Paper, Typography, Button, TextField } from '@mui/material';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 
-const TextChat = React.lazy(() => import('./TextChat'));
+const TextChatPage = React.lazy(() => import('./TextChatPage'));
+const AdminPage = React.lazy(() => import('./AdminPage'));
 
 export default function App() {
   const theme = createTheme({
@@ -17,10 +18,10 @@ export default function App() {
 
   function Home() {
     const [name, setName] = useState('');
-    const to = `/chat${name.trim() ? `?name=${encodeURIComponent(name.trim())}` : ''}`;
+    const to = `/play${name.trim() ? `?name=${encodeURIComponent(name.trim())}` : ''}`;
 
     return (
-      <Box sx={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'primary.background' }}>
+      <Box sx={{ height: '98vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'primary.background' }}>
         <Paper sx={{ p: 4, textAlign: 'center', bgcolor: 'background.paper', color: 'text.primary' }}>
           <Typography variant="h5" sx={{ mb: 2 }}>Welcome to TeamText</Typography>
           <Typography sx={{ mb: 2 }}>Let's start the conversation! Tell me your name...</Typography>
@@ -39,10 +40,26 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route
-            path="/chat"
+            path="/play"
             element={
               <Suspense fallback={<Box sx={{ p: 4 }}>Loading chat…</Box>}>
-                <TextChat />
+                <TextChatPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <Suspense fallback={<Box sx={{ p: 4 }}>Loading admin…</Box>}>
+                <AdminPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/control"
+            element={
+              <Suspense fallback={<Box sx={{ p: 4 }}>Loading admin…</Box>}>
+                <AdminPage />
               </Suspense>
             }
           />

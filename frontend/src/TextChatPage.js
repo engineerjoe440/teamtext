@@ -1,11 +1,18 @@
 import React from 'react';
-import { Box, Paper, TextField, IconButton, Typography, CircularProgress } from '@mui/material';
+import {
+  Box,
+  Paper,
+  TextField,
+  IconButton,
+  Typography,
+  CircularProgress
+} from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
 import './App.css';
 
 const MESSAGE_VISIBLE_TIME_MS = 5000;
 
-export default function TextChat() {
+export default function TextChatPage() {
   const [messages, setMessages] = React.useState([
     { id: 1, sender: 'teamtext-bot', text: "You're waiting for a message from another texter. It should appear shortly...", visible: true },
   ]);
@@ -30,11 +37,11 @@ export default function TextChat() {
       try {
         const loc = window.location;
         const protocol = loc.protocol === 'https:' ? 'wss:' : 'ws:';
-        // keep host (hostname:port) and use '/ws' path
-        return `${protocol}//${loc.host}/ws`;
+        // keep host (hostname:port) and use '/chat' path
+        return `${protocol}//${loc.host}/ws/chat`;
       } catch (e) {
         // Fallback to localhost if anything goes wrong (e.g., window undefined)
-        return 'ws://localhost:8000/ws';
+        return 'ws://localhost:8000/ws/chat';
       }
     })();
     let ws;
@@ -139,7 +146,7 @@ export default function TextChat() {
   const send = () => {
     const trimmed = text.trim();
     if (!trimmed) return;
-    const id = Date.now();
+    const id = window.client_hash ? `${window.client_hash}-${Date.now()}` : Date.now();
     // append locally immediately so UI is responsive
     setMessages((m) => [...m, { id, sender: window.player_name, text: trimmed }]);
     setText('');
@@ -166,11 +173,7 @@ export default function TextChat() {
   };
 
   return (
-      <Box sx={{ height: '95vh', bgcolor: 'primary.background', position: 'relative' }}>
-      {/* Header is positioned absolutely so content can size to full viewport without adding page scroll */}
-      <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 2 }}>
-        <Typography variant="h6" component="div" sx={{ textAlign: 'center', color: 'rgba(255,255,255,0.95)' }}>{window.game_title}</Typography>
-      </Box>
+      <Box sx={{ height: '98vh', bgcolor: 'primary.background', position: 'relative' }}>
 
       <Box sx={{ position: 'relative', height: '95vh' }}>
         <Paper
@@ -193,7 +196,11 @@ export default function TextChat() {
           }}
         >
           <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-            <Typography variant="subtitle1">TeamText</Typography>
+            <Typography variant="subtitle1">{window.game_title}</Typography>
+            <Typography variant="caption" color="text.secondary">
+              Playing as: <strong>{window.player_name}</strong>&nbsp;
+              <sub><i>({window.client_token})</i></sub>
+            </Typography>
           </Box>
 
           <Box
