@@ -20,8 +20,12 @@ router = APIRouter(prefix="/settings")
 class Settings:
     """Application Settings Container."""
 
+    playing: bool = False
     game_title: str = "TeamText"
-    starting_message: str = "Once upon a time..."
+    starting_message: str = (
+        "4-H is a community of young people across America who are learning "
+        "leadership, citizenship, and life skills."
+    )
 
 
 active = Settings()

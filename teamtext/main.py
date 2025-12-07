@@ -24,6 +24,9 @@ from teamtext.users import SessionManager, get_session_manager
 from teamtext.users import router as user_router
 from teamtext.settings import router as settings_router
 
+
+clients: SessionManager = get_session_manager()
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     """Application Lifespan System."""
@@ -38,9 +41,13 @@ router.include_router(settings_router)
 
 @router.post("/start-game")
 async def start_game():
-	"""Start the game by logging the event."""
-	logger.info("Game started with title: {}", get_settings().game_title)
-	return {"status": "Game started"}
+    """Start the game by logging the event."""
+    settings = get_settings()
+    settings.playing = True
+    logger.info("Game started with title: {}", settings.game_title)
+    if recipient := await clients.forward_message(settings.starting_message):
+        logger.info(f"Message sent to {recipient.player_name or recipient.user_id}")
+    return {"status": "Game started"}
 
 app = FastAPI(
 	title="TeamText",
@@ -49,9 +56,6 @@ app = FastAPI(
 	lifespan=lifespan,
 )
 app.include_router(router)
-
-
-clients: SessionManager = get_session_manager()
 
 # Configure the Logger
 app.logger = CustomLogger.make_logger(
@@ -84,10 +88,11 @@ def web_page_load(
     elif not clients.get_session(client_token=client_token):
         client_token = clients.new_session()
     # Set Player Name
-    clients.set_player_name(
-		client_token=client_token,
-		player_name=player_name,
-	)
+    if player_name:
+        clients.set_player_name(
+            client_token=client_token,
+            player_name=player_name,
+        )
     # Prepare the Response
     response = TEMPLATES.TemplateResponse(
         name="index.html",
@@ -149,5 +154,8 @@ async def websocket_endpoint(
             # For now simply echo the message back and log it
             print(f"Received from {user.user_id}:", data)
             await user.send_json({"echo": data, "text": "👍"})
+            if get_settings().playing:
+                if recipient := await clients.forward_message(data.get("text", ""), client_token=client_token):
+                    logger.info(f"Message forwarded to {recipient.player_name or recipient.user_id}")
     except WebSocketDisconnect:
         await clients.disconnect(client_token)

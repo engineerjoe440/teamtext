@@ -17,11 +17,19 @@ import {
   Tooltip
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import dataMessages from './strings.json';
+
+
+const randomMessage = () => {
+  if (dataMessages.length === 0) return '';
+  const idx = Math.floor(Math.random() * dataMessages.length);
+  return dataMessages[idx];
+};
 
 export default function AdminPage() {
   const [settingsApplied, setSettingsApplied] = React.useState(false);
   const [title, setTitle] = React.useState(window.game_title || 'TeamText');
-  const [message, setMessage] = React.useState('');
+  const [message, setMessage] = React.useState(randomMessage());
   const [participants, setParticipants] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState(null);
@@ -62,7 +70,7 @@ export default function AdminPage() {
           const settings = await res.json();
           if (mounted) {
             setTitle(settings.game_title || window.game_title || 'TeamText');
-            setMessage(settings.starting_message || '');
+            setMessage(settings.starting_message || randomMessage());
           }
         }
       } catch (e) {
@@ -147,7 +155,7 @@ export default function AdminPage() {
         />
 
         <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-          <Button variant="outlined" onClick={() => { setTitle(window.game_title || 'TeamText'); setMessage(''); }}>Reset</Button>
+          <Button variant="outlined" onClick={() => { setTitle(window.game_title || 'TeamText'); setMessage(randomMessage()); }}>Reset</Button>
           <Button variant="outlined" onClick={updateSettings}>Update Settings</Button>
         </Box>
 

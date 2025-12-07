@@ -24,14 +24,17 @@ class User:
 
     user_id: str
     player_name: Optional[str] = None
-    message_received: Optional[str] = None
+    messages_received: list[str] = []
     messages_sent: list[str] = []
     websocket: Optional[WebSocket] = None
+    recipient: Optional['User'] = None
 
     def __init__(self):
         self.user_id = str(uuid4())
+        self.messages_received = []
         self.messages_sent = []
         self.websocket = None
+        self.recipient = None
 
     @property
     def hash(self) -> str:
@@ -93,6 +96,30 @@ class SessionManager:
         user = self.get_session(client_token)
         if user:
             user.player_name = player_name
+
+    async def forward_message(self, message: str, client_token: Optional[str] = None) -> User | None:
+        """Send a Message to the Next User in the Session List."""
+        if not client_token:
+            for user in self.sessions.values():
+                # use the first connected user we find
+                if user.websocket and len(user.messages_received) == 0:
+                    client_token = user.user_id
+                    break
+        user = self.get_session(client_token)
+        if not user:
+            return None
+        if user.recipient is None or user.recipient.websocket is None:
+            for next_user in self.sessions.values():
+                # Skip self
+                if next_user.user_id == user.user_id:
+                    continue
+                # use the first connected user we find
+                if next_user.websocket and len(next_user.messages_received) == 0:
+                    user.recipient = next_user
+                    break
+        user.recipient.messages_received.append(message)
+        await user.recipient.send_json({"text": message})
+        return user.recipient
 
     async def connect(self, client_token: str, ws: WebSocket) -> User:
         """
