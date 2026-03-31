@@ -51,7 +51,7 @@ async def start_game():
 
 app = FastAPI(
 	title="TeamText",
-	summary="Modern reimagining of the classic telephone game for education!",
+	summary="Modern re-imagining of the classic telephone game for education!",
 	version=__version__,
 	lifespan=lifespan,
 )
@@ -155,7 +155,13 @@ async def websocket_endpoint(
             print(f"Received from {user.user_id}:", data)
             await user.send_json({"echo": data, "text": "👍"})
             if get_settings().playing:
-                if recipient := await clients.forward_message(data.get("text", ""), client_token=client_token):
-                    logger.info(f"Message forwarded to {recipient.player_name or recipient.user_id}")
+                if recipient := await clients.forward_message(
+                    data.get("text", ""),
+                    client_token=client_token
+                ):
+                    logger.info(
+                        "Message forwarded to "
+                        f"{recipient.player_name or recipient.user_id}"
+                    )
     except WebSocketDisconnect:
         await clients.disconnect(client_token)

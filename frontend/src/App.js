@@ -1,5 +1,5 @@
 import React, { Suspense, useState } from 'react';
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Box, Paper, Typography, Button, TextField } from '@mui/material';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 
@@ -27,7 +27,7 @@ export default function App() {
           <Typography sx={{ mb: 2 }}>Let's start the conversation! Tell me your name...</Typography>
           <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', justifyContent: 'center' }}>
             <TextField placeholder="Your name" size="small" value={name} onChange={(e) => setName(e.target.value)} />
-            <Button variant="contained" component={Link} to={to} disabled={!name.trim()}>Open Chat</Button>
+            <Button variant="contained" onClick={() => window.location.href = to} disabled={!name.trim()}>Open Chat</Button>
           </Box>
         </Paper>
       </Box>

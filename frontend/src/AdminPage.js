@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   Box,
-  CircularProgress,
   Paper,
   Typography,
   TextField,
@@ -14,11 +13,23 @@ import {
   List,
   ListItem,
   ListItemText,
-  Tooltip
+  Tooltip,
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@mui/material';
+import { keyframes } from '@mui/material/styles';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import dataMessages from './strings.json';
 
+
+const spin = keyframes`
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+`;
 
 const randomMessage = () => {
   if (dataMessages.length === 0) return '';
@@ -34,6 +45,8 @@ export default function AdminPage() {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState(null);
   const [expandedUserId, setExpandedUserId] = React.useState(null);
+  const [showInstructions, setShowInstructions] = React.useState(true);
+  const [finalMessage, setFinalMessage] = React.useState(null);
 
   const fetchParticipants = async () => {
     setLoading(true);
@@ -42,13 +55,14 @@ export default function AdminPage() {
       const res = await fetch('/api/users/list');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      // map into a normalized form
-      setParticipants(data.map((u) => ({
+      // API now returns { users: [...], final_message: ... }
+      setParticipants(data.users.map((u) => ({
         user_id: u.user_id,
         player_name: u.player_name || u.user_id,
         connected: !!u.connected,
         messages_sent: u.messages_sent || [],
       })));
+      setFinalMessage(data.final_message || null);
     } catch (e) {
       console.error('Failed to fetch participants', e);
       setError(String(e));
@@ -131,6 +145,24 @@ export default function AdminPage() {
     }
   };
 
+  const handleReset = async () => {
+    setTitle(window.game_title || 'TeamText');
+    setMessage(randomMessage());
+    try {
+      const res = await fetch('/api/users/clear', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      console.debug('Players cleared');
+      // Refresh participants list after clearing
+      await fetchParticipants();
+    } catch (e) {
+      console.error('Failed to clear players', e);
+      setError(String(e));
+    }
+  };
+
   return (
     <Box sx={{ p: 4, height: '90vh', display: 'flex', justifyContent: 'center', bgcolor: 'primary.background' }}>
       <Paper sx={{ width: { xs: '100%', md: '60%' }, p: 3 }} elevation={3}>
@@ -155,14 +187,22 @@ export default function AdminPage() {
         />
 
         <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-          <Button variant="outlined" onClick={() => { setTitle(window.game_title || 'TeamText'); setMessage(randomMessage()); }}>Reset</Button>
-          <Button variant="outlined" onClick={updateSettings}>Update Settings</Button>
+          <Button variant="outlined" onClick={handleReset}>Reset</Button>
+          <Button variant={settingsApplied ? "outlined" : "contained"} onClick={updateSettings}>Apply Settings</Button>
         </Box>
 
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
           <Typography variant="subtitle1">Active Players (participants)</Typography>
-          {loading && <CircularProgress size={20} />}
+          <IconButton onClick={fetchParticipants} disabled={loading} size="small">
+            <RefreshIcon sx={{ animation: loading ? `${spin} 1s linear infinite` : 'none' }} />
+          </IconButton>
         </Box>
+
+        {finalMessage && (
+          <Typography variant="body2" sx={{ mb: 2, p: 1, bgcolor: 'grey.100', borderRadius: 1 }}>
+            <strong>Final Message:</strong> {finalMessage}
+          </Typography>
+        )}
 
         {error && (
           <Typography color="error" sx={{ mb: 1 }}>{error}</Typography>
@@ -200,7 +240,7 @@ export default function AdminPage() {
           const messages = user?.messages_sent || [];
           return (
             <Accordion expanded={Boolean(expandedUserId)} sx={{ mb: 2 }}>
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}> 
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                 <Typography sx={{ fontWeight: 'bold' }}>{user?.player_name || expandedUserId}</Typography>
                 <Typography sx={{ ml: 2, color: 'text.secondary' }} variant="body2">{messages.length} messages</Typography>
               </AccordionSummary>
@@ -221,6 +261,24 @@ export default function AdminPage() {
           );
         })()}
       </Paper>
+
+      <Dialog open={showInstructions} onClose={() => setShowInstructions(false)}>
+        <DialogTitle>Setup Instructions</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            Before you can start playing the game with participants, please follow these steps:
+          </Typography>
+          <Box sx={{ pl: 2 }}>
+            <Typography variant="body2">1. Set the <strong>Game Title</strong></Typography>
+            <Typography variant="body2">2. Set an appropriate <strong>Message</strong></Typography>
+            <Typography variant="body2">3. Click the <strong>"Apply Settings"</strong> button to save your settings</Typography>
+            <Typography variant="body2">4. Then you can click <strong>"Start Game"</strong> to begin playing with participants</Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowInstructions(false)} variant="contained">Got It</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

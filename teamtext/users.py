@@ -73,8 +73,16 @@ class SessionManager:
     """Class to manage user sessions and attach websocket connections."""
 
     def __init__(self):
-        # sessions: dict[user_id, User]
+        """Set the Manager Variables."""
         self.sessions: dict[str, User] = {}
+        self.final_message: str = None
+
+    async def reset(self):
+        """Clear all sessions and messages."""
+        for user in self.sessions.values():
+            await user.close()
+        self.sessions: dict[str, User] = {}
+        self.final_message: str = None
 
     def new_session(self) -> str:
         """Create a new user session and return the session token."""
@@ -97,7 +105,11 @@ class SessionManager:
         if user:
             user.player_name = player_name
 
-    async def forward_message(self, message: str, client_token: Optional[str] = None) -> User | None:
+    async def forward_message(
+        self,
+        message: str,
+        client_token: Optional[str] = None
+    ) -> User | None:
         """Send a Message to the Next User in the Session List."""
         if not client_token:
             for user in self.sessions.values():
@@ -117,9 +129,13 @@ class SessionManager:
                 if next_user.websocket and len(next_user.messages_received) == 0:
                     user.recipient = next_user
                     break
-        user.recipient.messages_received.append(message)
-        await user.recipient.send_json({"text": message})
-        return user.recipient
+        if user.recipient:
+            user.recipient.messages_received.append(message)
+            await user.recipient.send_json({"text": message})
+            return user.recipient
+        # Fall Back to Setting Final Message if No Recipient Available
+        self.final_message = message
+        return None
 
     async def connect(self, client_token: str, ws: WebSocket) -> User:
         """
@@ -163,4 +179,12 @@ async def list_users():
             "connected": user.websocket is not None,
             "messages_sent": user.messages_sent,
         })
-    return users_list
+    return {
+        "users": users_list,
+        "final_message": active_sessions.final_message,
+    }
+
+@router.post("/clear")
+async def clear_messages():
+    """Clear all messages for all users."""
+    await active_sessions.reset()

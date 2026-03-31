@@ -5,21 +5,21 @@ import {
   TextField,
   IconButton,
   Typography,
-  CircularProgress
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button
 } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
 import './App.css';
 
-const MESSAGE_VISIBLE_TIME_MS = 5000;
-
 export default function TextChatPage() {
-  const [messages, setMessages] = React.useState([
-    { id: 1, sender: 'teamtext-bot', text: "You're waiting for a message from another texter. It should appear shortly...", visible: true },
-  ]);
-  const [loadingValue, setLoadingValue] = React.useState(0);
+  const [messages, setMessages] = React.useState([]);
   const [text, setText] = React.useState('');
+  const [modalOpen, setModalOpen] = React.useState(false);
+  const [botMessage, setBotMessage] = React.useState('');
   const listRef = React.useRef(null);
-  const visibleTimers = React.useRef(new Map());
   const wsRef = React.useRef(null);
 
   React.useEffect(() => {
@@ -63,10 +63,10 @@ export default function TextChatPage() {
         const payload = JSON.parse(ev.data);
         // Expect payload like: { id?, sender: 'teamtext-bot'|'<window.player_name>', text: '...' }
         if (payload && payload.text && payload.text !== '') {
-          const id = payload.id || Date.now();
           const text = payload.text || '';
-          // Add incoming bot message and mark visible so the loader shows
-          setMessages((m) => [...m, { id, sender: 'teamtext-bot', text, visible: true }]);
+          // Show incoming bot message in modal
+          setBotMessage(text);
+          setModalOpen(true);
         }
       } catch (e) {
         console.warn('Failed to parse WS message', e, ev.data);
@@ -92,56 +92,6 @@ export default function TextChatPage() {
       if (wsRef.current === ws) wsRef.current = null;
     };
   }, []);
-
-  // Schedule 5s deterministic loaders for any bot messages that have `visible: true`.
-  // Keep track of each timer's start time so we can compute progress.
-  React.useEffect(() => {
-    messages.forEach((m) => {
-      if (m.sender === 'teamtext-bot' && m.visible && !visibleTimers.current.has(m.id)) {
-        const start = Date.now();
-        const tid = setTimeout(() => {
-          setMessages((prev) => prev.map((msg) => (msg.id === m.id ? { ...msg, visible: false } : msg)));
-          visibleTimers.current.delete(m.id);
-        }, MESSAGE_VISIBLE_TIME_MS);
-        visibleTimers.current.set(m.id, { tid, start });
-      }
-    });
-  }, [messages]);
-
-  // Clear any pending timers on unmount
-  React.useEffect(() => {
-    const timers = visibleTimers.current;
-    return () => {
-      timers.forEach(({ tid }) => clearTimeout(tid));
-      timers.clear();
-    };
-  }, []);
-
-  // Update loadingValue (0-100) while any bot message is loading.
-  React.useEffect(() => {
-    let interval = null;
-    const anyLoading = messages.some((m) => m.sender === 'teamtext-bot' && m.visible);
-    if (anyLoading) {
-      interval = setInterval(() => {
-        const now = Date.now();
-        const starts = Array.from(visibleTimers.current.values()).map((v) => v.start).filter(Boolean);
-        if (starts.length === 0) {
-          setLoadingValue(0);
-          return;
-        }
-        const minStart = Math.min(...starts);
-        const elapsed = now - minStart;
-        const percent = Math.min(100, (elapsed / MESSAGE_VISIBLE_TIME_MS) * 100);
-        setLoadingValue(percent);
-      }, 100);
-    } else {
-      setLoadingValue(0);
-    }
-
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [messages]);
 
   const send = () => {
     const trimmed = text.trim();
@@ -223,27 +173,19 @@ export default function TextChatPage() {
                   justifyContent: m.sender === window.player_name ? 'flex-end' : 'flex-start',
                 }}
               >
-                {((m.visible && m.sender === 'teamtext-bot') || m.sender !== 'teamtext-bot') && (
-                  <Box
-                    sx={{
-                      maxWidth: '80%',
-                      bgcolor: m.sender === window.player_name ? 'primary.main' : 'grey.200',
-                      color: m.sender === window.player_name ? 'primary.contrastText' : 'text.primary',
-                      px: 2,
-                      py: 1,
-                      borderRadius: 2,
-                      wordBreak: 'break-word',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 1,
-                    }}
-                  >
-                    <Typography variant="body2">{m.text}</Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', ml: 1 }}>
-                      <CircularProgress size={16} color="inherit" variant="determinate" value={loadingValue} />
-                    </Box>
-                  </Box>
-                )}
+                <Box
+                  sx={{
+                    maxWidth: '80%',
+                    bgcolor: m.sender === window.player_name ? 'primary.main' : 'grey.200',
+                    color: m.sender === window.player_name ? 'primary.contrastText' : 'text.primary',
+                    px: 2,
+                    py: 1,
+                    borderRadius: 2,
+                    wordBreak: 'break-word',
+                  }}
+                >
+                  <Typography variant="body2">{m.text}</Typography>
+                </Box>
               </Box>
             ))}
           </Box>
@@ -268,6 +210,18 @@ export default function TextChatPage() {
           </Box>
         </Paper>
       </Box>
+
+      <Dialog open={modalOpen} onClose={() => setModalOpen(false)}>
+        <DialogTitle>New Message</DialogTitle>
+        <DialogContent>
+          <Typography style={{ userSelect: 'none' }}>{botMessage}</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => {
+            setModalOpen(false);
+          }}>OK</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
