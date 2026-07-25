@@ -1,8 +1,10 @@
+"""Test fixtures and helpers for TeamText unit tests."""
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
+from teamtext.main import app
 from teamtext import settings as settings_module
 from teamtext import users as users_module
 
@@ -24,43 +26,37 @@ class DummyWebSocket:
         self.close_code = None
 
     async def send_json(self, payload):
+        """Simulate sending JSON to the websocket by storing it in a list."""
         self.sent_payloads.append(payload)
 
     async def receive_json(self):
+        """Simulate receiving JSON from the websocket by popping from a queue."""
         if not self.receive_queue:
             return {}
         return self.receive_queue.pop(0)
 
     async def close(self, code=1000):
+        """Simulate closing the websocket by setting a closed flag."""
         self.closed = True
         self.close_code = code
 
 
 def _ensure_runtime_assets() -> None:
-    """Ensure template/static paths required by app startup exist in tests."""
-    package_dir = Path(__file__).resolve().parents[1] / "teamtext"
+    """Validate package template/static paths required by app startup."""
+    package_dir = Path(__file__).resolve().parent / "teamtext"
     static_dir = package_dir / "static"
     templates_dir = package_dir / "templates"
     index_template = templates_dir / "index.html"
 
-    static_dir.mkdir(parents=True, exist_ok=True)
-    templates_dir.mkdir(parents=True, exist_ok=True)
-
-    if not index_template.exists():
-        index_template.write_text(
-            """
-<!doctype html>
-<html>
-  <body>
-    TeamText test template
-    {{ client_id_token }}
-    {{ client_hash }}
-    {{ game_title }}
-    {{ player_name }}
-  </body>
-</html>
-""".strip(),
-            encoding="utf-8",
+    missing_paths = [
+        path
+        for path in (static_dir, templates_dir, index_template)
+        if not path.exists()
+    ]
+    if missing_paths:
+        missing_list = ", ".join(str(path) for path in missing_paths)
+        raise RuntimeError(
+            f"Missing runtime assets required for tests: {missing_list}"
         )
 
 
@@ -86,8 +82,8 @@ def reset_global_state():
 
 @pytest.fixture
 def client():
+    """Provide a FastAPI TestClient for API and websocket tests."""
     _ensure_runtime_assets()
-    from teamtext.main import app
 
     with TestClient(app) as test_client:
         yield test_client

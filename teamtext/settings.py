@@ -17,6 +17,7 @@ class SettingsModel(BaseModel):
 
 router = APIRouter(prefix="/settings")
 
+# pylint: disable=too-few-public-methods
 class Settings:
     """Application Settings Container."""
 
@@ -26,6 +27,7 @@ class Settings:
         "4-H is a community of young people across America who are learning "
         "leadership, citizenship, and life skills."
     )
+# pylint: enable=too-few-public-methods
 
 
 active = Settings()
