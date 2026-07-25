@@ -1,0 +1,8 @@
+pytest
+httpx
+anyio
+pytest-asyncio
+numpy
+typing-inspect
+pylint
+ruff
