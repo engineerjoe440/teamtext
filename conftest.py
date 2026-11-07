@@ -44,7 +44,7 @@ def _ensure_runtime_assets() -> None:
     """Validate frontend build paths required by app startup and tests."""
     package_dir = Path(__file__).resolve().parent / "teamtext"
     static_dir = package_dir / "static"
-    index_template = static_dir / "frontend" / "index.html"
+    index_template = package_dir / "templates" / "index.html"
 
     missing_paths = [
         path

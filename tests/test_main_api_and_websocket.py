@@ -1,13 +1,13 @@
 """Tests for application routes and websocket behavior."""
 
 from conftest import DummyWebSocket
-from teamtext.main import clients
+from teamtext.main import clients as session_clients
 from teamtext.settings import get_settings
 
 
 def _clients():
     """Return the active application session manager."""
-    return clients
+    return session_clients
 
 
 def test_root_sets_client_cookie_and_creates_session(client):
