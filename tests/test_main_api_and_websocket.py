@@ -1,6 +1,5 @@
-from teamtext.settings import get_settings
-
 from conftest import DummyWebSocket
+from teamtext.settings import get_settings
 
 
 def _clients():
@@ -77,12 +76,18 @@ def test_websocket_echoes_and_forwards_when_game_is_playing(client):
     sender_token = clients.new_session()
     recipient_token = clients.new_session()
 
-    with client.websocket_connect(f"/ws/chat?client_token={sender_token}") as sender_ws:
-        with client.websocket_connect(f"/ws/chat?client_token={recipient_token}") as recipient_ws:
-            sender_ws.send_json({"text": "telephone"})
+    with (
+        client.websocket_connect(
+            f"/ws/chat?client_token={sender_token}"
+        ) as sender_ws,
+        client.websocket_connect(
+            f"/ws/chat?client_token={recipient_token}"
+        ) as recipient_ws,
+    ):
+        sender_ws.send_json({"text": "telephone"})
 
-            echo = sender_ws.receive_json()
-            forwarded = recipient_ws.receive_json()
+        echo = sender_ws.receive_json()
+        forwarded = recipient_ws.receive_json()
 
     assert echo == {"echo": {"text": "telephone"}, "text": "👍"}
     assert forwarded == {"text": "telephone"}

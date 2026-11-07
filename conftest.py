@@ -4,10 +4,9 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from teamtext.main import app
 from teamtext import settings as settings_module
 from teamtext import users as users_module
-
+from teamtext.main import app
 
 DEFAULT_GAME_TITLE = "TeamText"
 DEFAULT_STARTING_MESSAGE = (

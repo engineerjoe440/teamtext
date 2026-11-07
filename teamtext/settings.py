@@ -9,6 +9,7 @@ TeamText - Modern reimagining of the classic telephone game for education!
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+
 class SettingsModel(BaseModel):
     """Pydantic Model for Application Settings."""
 

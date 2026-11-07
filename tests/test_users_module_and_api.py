@@ -1,8 +1,7 @@
 import pytest
 
-from teamtext.users import SessionManager, User, active_sessions
-
 from conftest import DummyWebSocket
+from teamtext.users import SessionManager, User, active_sessions
 
 
 def test_new_session_and_hash_roundtrip():
