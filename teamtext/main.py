@@ -70,7 +70,7 @@ app.mount(
 
 # Load Templates
 TEMPLATES: Jinja2Templates = Jinja2Templates(
-    directory=(Path(__file__).parent/"templates")
+    directory=Path(__file__).parent / "static" / "frontend"
 )
 
 

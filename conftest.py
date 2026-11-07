@@ -41,15 +41,14 @@ class DummyWebSocket:
 
 
 def _ensure_runtime_assets() -> None:
-    """Validate package template/static paths required by app startup."""
+    """Validate frontend build paths required by app startup and tests."""
     package_dir = Path(__file__).resolve().parent / "teamtext"
     static_dir = package_dir / "static"
-    templates_dir = package_dir / "templates"
-    index_template = templates_dir / "index.html"
+    index_template = static_dir / "frontend" / "index.html"
 
     missing_paths = [
         path
-        for path in (static_dir, templates_dir, index_template)
+        for path in (static_dir, index_template)
         if not path.exists()
     ]
     if missing_paths:
