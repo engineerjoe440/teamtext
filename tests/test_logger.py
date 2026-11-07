@@ -1,3 +1,5 @@
+"""Tests for application logging configuration and interception."""
+
 import json
 import logging
 
@@ -5,6 +7,7 @@ from teamtext.logger import CustomLogger, InterceptHandler
 
 
 def test_load_logging_config_reads_json_file(tmp_path):
+    """Load a JSON logging configuration from disk."""
     config_path = tmp_path / "log_conf.json"
     config_data = {
         "logger": {
@@ -23,6 +26,7 @@ def test_load_logging_config_reads_json_file(tmp_path):
 
 
 def test_make_logger_uses_config_and_returns_bound_logger(tmp_path):
+    """Create a bound logger using the supplied configuration."""
     config_path = tmp_path / "log_conf.json"
     log_file = tmp_path / "app.log"
     config_data = {
@@ -43,6 +47,7 @@ def test_make_logger_uses_config_and_returns_bound_logger(tmp_path):
 
 
 def test_intercept_handler_emit_accepts_standard_record():
+    """Allow the intercept handler to process a standard log record."""
     handler = InterceptHandler()
     record = logging.LogRecord(
         name="test",

@@ -14,17 +14,19 @@ system that can be used by volunteers and youth to engage with event photos.
 """
 ################################################################################
 
+import json
 import logging
 import sys
-import json
 from pathlib import Path
+from typing import ClassVar
+
 from loguru import logger
 
 
 class InterceptHandler(logging.Handler):
     """Handle Logging Interceptions."""
 
-    loglevel_mapping = {
+    loglevel_mapping: ClassVar[dict[int, str]] = {
         50: 'CRITICAL',
         40: 'ERROR',
         30: 'WARNING',

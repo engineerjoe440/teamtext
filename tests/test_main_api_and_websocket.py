@@ -1,15 +1,17 @@
-from teamtext.settings import get_settings
+"""Tests for application routes and websocket behavior."""
 
 from conftest import DummyWebSocket
+from teamtext.main import clients as session_clients
+from teamtext.settings import get_settings
 
 
 def _clients():
-    from teamtext.main import clients
-
-    return clients
+    """Return the active application session manager."""
+    return session_clients
 
 
 def test_root_sets_client_cookie_and_creates_session(client):
+    """Create a session and cookie when serving the application page."""
     clients = _clients()
     response = client.get("/")
 
@@ -21,6 +23,7 @@ def test_root_sets_client_cookie_and_creates_session(client):
 
 
 def test_root_reuses_existing_valid_cookie(client):
+    """Reuse a valid client session cookie."""
     clients = _clients()
     first = client.get("/")
     token = first.cookies["client_token"]
@@ -33,6 +36,7 @@ def test_root_reuses_existing_valid_cookie(client):
 
 
 def test_root_replaces_unknown_cookie(client):
+    """Replace a cookie that does not identify a session."""
     clients = _clients()
     response = client.get("/play", cookies={"client_token": "unknown-token"})
 
@@ -42,6 +46,7 @@ def test_root_replaces_unknown_cookie(client):
 
 
 def test_root_sets_player_name_from_query_parameter(client):
+    """Store the player name provided in the page query string."""
     clients = _clients()
     response = client.get("/play", params={"name": "Jordan"})
     token = response.cookies["client_token"]
@@ -51,6 +56,7 @@ def test_root_sets_player_name_from_query_parameter(client):
 
 
 def test_start_game_marks_playing_and_forwards_starting_message(client):
+    """Start the game and forward its opening message."""
     clients = _clients()
     settings = get_settings()
     settings.starting_message = "Game starts now"
@@ -70,6 +76,7 @@ def test_start_game_marks_playing_and_forwards_starting_message(client):
 
 
 def test_websocket_echoes_and_forwards_when_game_is_playing(client):
+    """Echo websocket messages and forward them while the game is active."""
     clients = _clients()
     settings = get_settings()
     settings.playing = True
@@ -77,12 +84,18 @@ def test_websocket_echoes_and_forwards_when_game_is_playing(client):
     sender_token = clients.new_session()
     recipient_token = clients.new_session()
 
-    with client.websocket_connect(f"/ws/chat?client_token={sender_token}") as sender_ws:
-        with client.websocket_connect(f"/ws/chat?client_token={recipient_token}") as recipient_ws:
-            sender_ws.send_json({"text": "telephone"})
+    with (
+        client.websocket_connect(
+            f"/ws/chat?client_token={sender_token}"
+        ) as sender_ws,
+        client.websocket_connect(
+            f"/ws/chat?client_token={recipient_token}"
+        ) as recipient_ws,
+    ):
+        sender_ws.send_json({"text": "telephone"})
 
-            echo = sender_ws.receive_json()
-            forwarded = recipient_ws.receive_json()
+        echo = sender_ws.receive_json()
+        forwarded = recipient_ws.receive_json()
 
     assert echo == {"echo": {"text": "telephone"}, "text": "👍"}
     assert forwarded == {"text": "telephone"}
@@ -90,6 +103,7 @@ def test_websocket_echoes_and_forwards_when_game_is_playing(client):
 
 
 def test_websocket_without_token_creates_session_and_echoes(client):
+    """Create a session and echo messages for a tokenless websocket."""
     clients = _clients()
     before = set(clients.sessions)
 

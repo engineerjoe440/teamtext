@@ -1,11 +1,13 @@
+"""Tests for user sessions and their API endpoints."""
+
 import pytest
 
-from teamtext.users import SessionManager, User, active_sessions
-
 from conftest import DummyWebSocket
+from teamtext.users import SessionManager, User, active_sessions
 
 
 def test_new_session_and_hash_roundtrip():
+    """Create a session and retrieve its token hash."""
     manager = SessionManager()
 
     token = manager.new_session()
@@ -17,15 +19,17 @@ def test_new_session_and_hash_roundtrip():
 
 
 def test_set_player_name_is_noop_for_missing_session():
+    """Ignore player-name updates for unknown sessions."""
     manager = SessionManager()
 
     manager.set_player_name("does-not-exist", "Nora")
 
-    assert manager.sessions == {}
+    assert not manager.sessions
 
 
 @pytest.mark.asyncio
 async def test_user_receive_json_tracks_sent_messages():
+    """Track messages received from a connected websocket."""
     user = User()
     ws = DummyWebSocket(receive_queue=[{"text": "hello"}, {"other": "value"}])
 
@@ -40,6 +44,7 @@ async def test_user_receive_json_tracks_sent_messages():
 
 @pytest.mark.asyncio
 async def test_forward_message_to_next_connected_recipient():
+    """Forward a message to the next connected session."""
     manager = SessionManager()
     sender_token = manager.new_session()
     recipient_token = manager.new_session()
@@ -61,6 +66,7 @@ async def test_forward_message_to_next_connected_recipient():
 
 @pytest.mark.asyncio
 async def test_forward_message_sets_final_message_when_no_recipient():
+    """Store a final message when there is no connected recipient."""
     manager = SessionManager()
     sender_token = manager.new_session()
 
@@ -71,6 +77,7 @@ async def test_forward_message_sets_final_message_when_no_recipient():
 
 
 def test_list_users_endpoint_reports_users_and_connection_state(client):
+    """Report each user's name, connection status, and sent messages."""
     token = active_sessions.new_session()
     active_sessions.set_player_name(token, "Ava")
     active_sessions.get_session(token).websocket = DummyWebSocket()
@@ -91,6 +98,7 @@ def test_list_users_endpoint_reports_users_and_connection_state(client):
 
 
 def test_clear_users_endpoint_resets_sessions_and_final_message(client):
+    """Clear active sessions and the final message through the API."""
     token = active_sessions.new_session()
     active_sessions.get_session(token).messages_sent.append("already sent")
     active_sessions.final_message = "old final"
@@ -98,7 +106,7 @@ def test_clear_users_endpoint_resets_sessions_and_final_message(client):
     response = client.post("/api/users/clear")
 
     assert response.status_code == 200
-    assert active_sessions.sessions == {}
+    assert not active_sessions.sessions
     assert active_sessions.final_message is None
 
     list_response = client.get("/api/users/list")

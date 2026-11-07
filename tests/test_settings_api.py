@@ -1,7 +1,10 @@
+"""Tests for the settings API."""
+
 from teamtext.settings import get_settings
 
 
 def test_get_settings_defaults(client):
+    """Return default settings from the API."""
     response = client.get("/api/settings/")
 
     assert response.status_code == 200
@@ -15,6 +18,7 @@ def test_get_settings_defaults(client):
 
 
 def test_set_settings_persists_and_reads_back(client):
+    """Persist settings updates and return the updated values."""
     payload = {
         "game_title": "Classroom Whisper Chain",
         "starting_message": "The first clue starts now.",
@@ -34,6 +38,7 @@ def test_set_settings_persists_and_reads_back(client):
 
 
 def test_set_settings_requires_required_fields(client):
+    """Reject settings updates that omit required fields."""
     response = client.post("/api/settings/", json={"game_title": "Missing message"})
 
     assert response.status_code == 422

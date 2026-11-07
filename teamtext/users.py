@@ -7,10 +7,8 @@ TeamText - Modern reimagining of the classic telephone game for education!
 ################################################################################
 
 from uuid import uuid4
-from typing import Optional
 
-from fastapi import WebSocket, APIRouter
-
+from fastapi import APIRouter, WebSocket
 
 router = APIRouter(prefix="/users")
 
@@ -22,19 +20,13 @@ class User:
     disconnect.
     """
 
-    user_id: str
-    player_name: Optional[str] = None
-    messages_received: list[str] = []
-    messages_sent: list[str] = []
-    websocket: Optional[WebSocket] = None
-    recipient: Optional['User'] = None
-
     def __init__(self):
         self.user_id = str(uuid4())
-        self.messages_received = []
-        self.messages_sent = []
-        self.websocket = None
-        self.recipient = None
+        self.player_name: str | None = None
+        self.messages_received: list[str] = []
+        self.messages_sent: list[str] = []
+        self.websocket: WebSocket | None = None
+        self.recipient: User | None = None
 
     @property
     def hash(self) -> str:
@@ -90,11 +82,11 @@ class SessionManager:
         self.sessions[user.user_id] = user
         return user.user_id
 
-    def get_session(self, client_token: str) -> Optional[User]:
+    def get_session(self, client_token: str) -> User | None:
         """Retrieve a user session by its token."""
         return self.sessions.get(client_token)
 
-    def get_session_hash(self, client_token: str) -> Optional[str]:
+    def get_session_hash(self, client_token: str) -> str | None:
         """Retrieve the hash of a user session by its token."""
         user = self.get_session(client_token)
         return user.hash if user else None
@@ -108,7 +100,7 @@ class SessionManager:
     async def forward_message(
         self,
         message: str,
-        client_token: Optional[str] = None
+        client_token: str | None = None
     ) -> User | None:
         """Send a Message to the Next User in the Session List."""
         if not client_token:

@@ -6,11 +6,11 @@ TeamText - Modern reimagining of the classic telephone game for education!
 """
 ################################################################################
 
-from typing import Annotated, Optional
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Annotated
 
-from fastapi import FastAPI, APIRouter, WebSocket, WebSocketDisconnect, Cookie
+from fastapi import APIRouter, Cookie, FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.requests import Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -20,10 +20,9 @@ from loguru import logger
 from teamtext import __header__, __version__
 from teamtext.logger import CustomLogger
 from teamtext.settings import get_settings
+from teamtext.settings import router as settings_router
 from teamtext.users import SessionManager, get_session_manager
 from teamtext.users import router as user_router
-from teamtext.settings import router as settings_router
-
 
 clients: SessionManager = get_session_manager()
 
@@ -71,7 +70,7 @@ app.mount(
 
 # Load Templates
 TEMPLATES: Jinja2Templates = Jinja2Templates(
-    directory=(Path(__file__).parent/"templates")
+    directory=Path(__file__).parent / "templates"
 )
 
 
@@ -79,13 +78,11 @@ TEMPLATES: Jinja2Templates = Jinja2Templates(
 def web_page_load(
     request: Request,
     client_token: Annotated[str | None, Cookie()] = None,
-	player_name: Optional[str] = None,
+	player_name: str | None = None,
 ) -> HTMLResponse:
     """General Web Page Response Loader."""
     # Set Client Token if Needed
-    if not client_token:
-        client_token = clients.new_session()
-    elif not clients.get_session(client_token=client_token):
+    if not client_token or not clients.get_session(client_token=client_token):
         client_token = clients.new_session()
     # Set Player Name
     if player_name:
@@ -117,7 +114,7 @@ def web_page_load(
 async def root(
     request: Request,
     client_token: Annotated[str | None, Cookie()] = None,
-	name: Optional[str] = None,
+	name: str | None = None,
 ):
     """Server Root."""
     return web_page_load(
@@ -154,14 +151,15 @@ async def websocket_endpoint(
             # For now simply echo the message back and log it
             print(f"Received from {user.user_id}:", data)
             await user.send_json({"echo": data, "text": "👍"})
-            if get_settings().playing:
-                if recipient := await clients.forward_message(
+            if get_settings().playing and (
+                recipient := await clients.forward_message(
                     data.get("text", ""),
                     client_token=client_token
-                ):
-                    logger.info(
-                        "Message forwarded to "
-                        f"{recipient.player_name or recipient.user_id}"
-                    )
+                )
+            ):
+                logger.info(
+                    "Message forwarded to "
+                    f"{recipient.player_name or recipient.user_id}"
+                )
     except WebSocketDisconnect:
         await clients.disconnect(client_token)
