@@ -6,7 +6,6 @@ import {
   TextField,
   Button,
   Chip,
-  Stack,
   Accordion,
   AccordionSummary,
   AccordionDetails,
@@ -31,17 +30,109 @@ const spin = keyframes`
   100% { transform: rotate(360deg); }
 `;
 
+const drawArrow = keyframes`
+  from { stroke-dashoffset: 100; }
+  to { stroke-dashoffset: 0; }
+`;
+
 const randomMessage = () => {
   if (dataMessages.length === 0) return '';
   const idx = Math.floor(Math.random() * dataMessages.length);
   return dataMessages[idx];
 };
 
+function PlayerHandoffs({ participants, handoffs, onSelect }) {
+  const containerRef = React.useRef(null);
+  const playerRefs = React.useRef(new Map());
+  const [positions, setPositions] = React.useState({});
+  const markerId = React.useId();
+  const connections = [];
+  handoffs.forEach(({ sender_id: senderId, receiver_id: receiverId }) => {
+    const connection = connections.find((item) => item.senderId === senderId && item.receiverId === receiverId);
+    if (connection) connection.count += 1;
+    else connections.push({ senderId, receiverId, count: 1 });
+  });
+  const visibleConnections = connections.filter(({ senderId, receiverId }) => (
+    participants.some((player) => player.user_id === senderId) &&
+    participants.some((player) => player.user_id === receiverId)
+  ));
+  const topPadding = visibleConnections.length ? visibleConnections.length * 34 + 12 : 0;
+
+  React.useLayoutEffect(() => {
+    const measure = () => {
+      if (!containerRef.current) return;
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const next = {};
+      playerRefs.current.forEach((element, id) => {
+        const rect = element.getBoundingClientRect();
+        next[id] = { x: rect.left - containerRect.left + rect.width / 2, y: rect.top - containerRect.top };
+      });
+      setPositions(next);
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    if (observer) {
+      observer.observe(containerRef.current);
+      playerRefs.current.forEach((element) => observer.observe(element));
+    }
+    return () => {
+      window.removeEventListener('resize', measure);
+      if (observer) observer.disconnect();
+    };
+  }, [participants, handoffs]);
+
+  return (
+    <Box sx={{ overflowX: 'auto', mb: 2 }}>
+      <Box ref={containerRef} sx={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 5, width: 'max-content', minWidth: '100%', pt: `${topPadding}px`, pb: 0.5 }}>
+        {visibleConnections.length > 0 && (
+          <Box component="svg" role="group" aria-label="Message handoffs" sx={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible', color: 'primary.main' }}>
+            <defs>
+              <marker id={markerId} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" />
+              </marker>
+            </defs>
+            {visibleConnections.map(({ senderId, receiverId, count }, index) => {
+              const start = positions[senderId];
+              const end = positions[receiverId];
+              if (!start || !end) return null;
+              const middleX = (start.x + end.x) / 2;
+              const peakY = Math.min(start.y, end.y) - 28 - index * 34;
+              const controlY = 2 * peakY - (start.y + end.y) / 2;
+              const sender = participants.find((player) => player.user_id === senderId);
+              const receiver = participants.find((player) => player.user_id === receiverId);
+              const badgeWidth = Math.max(22, String(count).length * 8 + 12);
+              return (
+                <g key={JSON.stringify([senderId, receiverId])} role="img" aria-label={`${sender.player_name} sent ${count} ${count === 1 ? 'message' : 'messages'} to ${receiver.player_name}`}>
+                  <Box component="path" d={`M ${start.x} ${start.y} Q ${middleX} ${controlY} ${end.x} ${end.y}`} fill="none" stroke="currentColor" strokeWidth="2" markerEnd={`url(#${markerId})`} pathLength="100" sx={{ strokeDasharray: 100, animation: `${drawArrow} 700ms ease-out`, '@media (prefers-reduced-motion: reduce)': { animation: 'none' } }} />
+                  <rect x={middleX - badgeWidth / 2} y={peakY - 11} width={badgeWidth} height="22" rx="11" fill="currentColor" />
+                  <text x={middleX} y={peakY} textAnchor="middle" dominantBaseline="central" fill="white" fontSize="12" fontWeight="600">{count}</text>
+                </g>
+              );
+            })}
+          </Box>
+        )}
+        {participants.map((player) => (
+          <Box key={player.user_id} ref={(element) => {
+            if (element) playerRefs.current.set(player.user_id, element);
+            else playerRefs.current.delete(player.user_id);
+          }}>
+            <Tooltip title={player.user_id}>
+              <Chip label={player.player_name} color={player.connected ? 'primary' : 'default'} variant={player.connected ? 'filled' : 'outlined'} sx={{ maxWidth: 200, cursor: 'pointer' }} onClick={() => onSelect(player.user_id)} />
+            </Tooltip>
+          </Box>
+        ))}
+      </Box>
+    </Box>
+  );
+}
+
 export default function AdminPage() {
   const [settingsApplied, setSettingsApplied] = React.useState(false);
   const [title, setTitle] = React.useState(window.game_title || 'TeamText');
   const [message, setMessage] = React.useState(randomMessage());
   const [participants, setParticipants] = React.useState([]);
+  const [handoffs, setHandoffs] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState(null);
   const [expandedUserId, setExpandedUserId] = React.useState(null);
@@ -63,6 +154,7 @@ export default function AdminPage() {
         messages_sent: u.messages_sent || [],
       })));
       setFinalMessage(data.final_message || null);
+      setHandoffs(data.handoffs || []);
     } catch (e) {
       console.error('Failed to fetch participants', e);
       setError(String(e));
@@ -193,7 +285,7 @@ export default function AdminPage() {
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
           <Typography variant="subtitle1">Active Players (participants)</Typography>
-          <IconButton onClick={fetchParticipants} disabled={loading} size="small">
+          <IconButton onClick={fetchParticipants} disabled={loading} size="small" aria-label="Refresh participants">
             <RefreshIcon sx={{ animation: loading ? `${spin} 1s linear infinite` : 'none' }} />
           </IconButton>
         </Box>
@@ -208,19 +300,7 @@ export default function AdminPage() {
           <Typography color="error" sx={{ mb: 1 }}>{error}</Typography>
         )}
 
-        <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', mb: 2 }}>
-          {participants.map((u) => (
-            <Tooltip key={u.user_id} title={u.user_id} >
-              <Chip
-                label={u.player_name}
-                color={u.connected ? 'primary' : 'default'}
-                variant={u.connected ? 'filled' : 'outlined'}
-                sx={{ m: 0.5, cursor: 'pointer' }}
-                onClick={() => setExpandedUserId((prev) => (prev === u.user_id ? null : u.user_id))}
-              />
-            </Tooltip>
-          ))}
-        </Stack>
+        <PlayerHandoffs participants={participants} handoffs={handoffs} onSelect={(id) => setExpandedUserId((prev) => (prev === id ? null : id))} />
 
         <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
           { !settingsApplied ? (

@@ -1,6 +1,5 @@
 """Tests for application routes and websocket behavior."""
 
-from conftest import DummyWebSocket
 from teamtext.main import clients as session_clients
 from teamtext.settings import get_settings
 
@@ -56,23 +55,45 @@ def test_root_sets_player_name_from_query_parameter(client):
 
 
 def test_start_game_marks_playing_and_forwards_starting_message(client):
-    """Start the game and forward its opening message."""
+    """Send the opening message to the only connected player."""
     clients = _clients()
     settings = get_settings()
     settings.starting_message = "Game starts now"
 
-    sender_token = clients.new_session()
     recipient_token = clients.new_session()
 
-    clients.get_session(sender_token).websocket = DummyWebSocket()
-    clients.get_session(recipient_token).websocket = DummyWebSocket()
+    with client.websocket_connect(f"/ws/chat?client_token={recipient_token}") as ws:
+        response = client.post("/api/start-game")
 
-    response = client.post("/api/start-game")
+        assert response.status_code == 200
+        assert response.json() == {"status": "Game started"}
+        assert settings.playing is True
+        assert clients.get_session(recipient_token).messages_received == ["Game starts now"]
+        assert clients.final_message is None
+        assert ws.receive_json() == {"text": "Game starts now"}
 
-    assert response.status_code == 200
-    assert response.json() == {"status": "Game started"}
-    assert settings.playing is True
-    assert clients.get_session(recipient_token).messages_received == ["Game starts now"]
+
+def test_start_game_uses_connection_order_and_forwards_next_message(client):
+    """Start with the first connection even when sessions were created out of order."""
+    clients = _clients()
+    get_settings().starting_message = "opening"
+    second_token = clients.new_session()
+    first_token = clients.new_session()
+
+    with (
+        client.websocket_connect(f"/ws/chat?client_token={first_token}") as first_ws,
+        client.websocket_connect(f"/ws/chat?client_token={second_token}") as second_ws,
+    ):
+        response = client.post("/api/start-game")
+
+        assert response.status_code == 200
+        assert clients.get_session(first_token).messages_received == ["opening"]
+        assert clients.get_session(second_token).messages_received == []
+        assert first_ws.receive_json() == {"text": "opening"}
+
+        first_ws.send_json({"text": "next"})
+        assert first_ws.receive_json() == {"echo": {"text": "next"}, "text": "👍"}
+        assert second_ws.receive_json() == {"text": "next"}
 
 
 def test_websocket_echoes_and_forwards_when_game_is_playing(client):

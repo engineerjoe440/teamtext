@@ -67,6 +67,7 @@ def reset_global_state():
 
     users_module.active_sessions.sessions = {}
     users_module.active_sessions.final_message = None
+    users_module.active_sessions.handoffs = []
 
     yield
 
@@ -76,6 +77,7 @@ def reset_global_state():
 
     users_module.active_sessions.sessions = {}
     users_module.active_sessions.final_message = None
+    users_module.active_sessions.handoffs = []
 
 
 @pytest.fixture

@@ -6,11 +6,13 @@ TeamText - Modern reimagining of the classic telephone game for education!
 """
 ################################################################################
 
+from itertools import count
 from uuid import uuid4
 
 from fastapi import APIRouter, WebSocket
 
 router = APIRouter(prefix="/users")
+connection_order = count()
 
 class User:
     """Class representing a user in TeamText.
@@ -26,6 +28,7 @@ class User:
         self.messages_received: list[str] = []
         self.messages_sent: list[str] = []
         self.websocket: WebSocket | None = None
+        self.connection_order = -1
         self.recipient: User | None = None
 
     @property
@@ -36,6 +39,7 @@ class User:
     async def connect(self, ws: WebSocket) -> None:
         """Attach a WebSocket connection to this user."""
         self.websocket = ws
+        self.connection_order = next(connection_order)
 
     async def send_json(self, obj) -> None:
         """Send JSON to the user's websocket if connected."""
@@ -68,6 +72,7 @@ class SessionManager:
         """Set the Manager Variables."""
         self.sessions: dict[str, User] = {}
         self.final_message: str = None
+        self.handoffs: list[dict[str, str]] = []
 
     async def reset(self):
         """Clear all sessions and messages."""
@@ -75,6 +80,7 @@ class SessionManager:
             await user.close()
         self.sessions: dict[str, User] = {}
         self.final_message: str = None
+        self.handoffs = []
 
     def new_session(self) -> str:
         """Create a new user session and return the session token."""
@@ -104,15 +110,20 @@ class SessionManager:
     ) -> User | None:
         """Send a Message to the Next User in the Session List."""
         if not client_token:
-            for user in self.sessions.values():
-                # use the first connected user we find
-                if user.websocket and len(user.messages_received) == 0:
-                    client_token = user.user_id
-                    break
+            first_user = min(
+                (user for user in self.sessions.values() if user.websocket),
+                key=lambda user: user.connection_order,
+                default=None,
+            )
+            if first_user:
+                await first_user.send_json({"text": message})
+                first_user.messages_received.append(message)
+            return first_user
         user = self.get_session(client_token)
         if not user:
             return None
         if user.recipient is None or user.recipient.websocket is None:
+            user.recipient = None
             for next_user in self.sessions.values():
                 # Skip self
                 if next_user.user_id == user.user_id:
@@ -124,6 +135,10 @@ class SessionManager:
         if user.recipient:
             user.recipient.messages_received.append(message)
             await user.recipient.send_json({"text": message})
+            self.handoffs.append({
+                "sender_id": user.user_id,
+                "receiver_id": user.recipient.user_id,
+            })
             return user.recipient
         # Fall Back to Setting Final Message if No Recipient Available
         self.final_message = message
@@ -174,6 +189,7 @@ async def list_users():
     return {
         "users": users_list,
         "final_message": active_sessions.final_message,
+        "handoffs": active_sessions.handoffs,
     }
 
 @router.post("/clear")
